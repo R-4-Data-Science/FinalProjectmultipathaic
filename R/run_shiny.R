@@ -11,7 +11,7 @@
 #' launch_app()
 #' }
 launch_app <- function() {
-  app_dir <- system.file("shiny", package = "multipathaic")
+  app_dir <- system.file("RS_int", package = "multipathaic")
   if (app_dir == "") {
     stop("Could not find Shiny app directory. Try re-installing `multipathaic`.")
   }
