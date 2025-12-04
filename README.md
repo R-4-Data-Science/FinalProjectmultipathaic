@@ -40,6 +40,8 @@ Explore the multi-path AIC selection procedure interactively with our built-in S
 
 ### Launch the App
 ```r
+# Install required packages first
+install.packages(c("shiny", "shinydashboard", "plotly", "DT", "ggplot2", "readxl"))
 library(multipathaic)
 launch_app()
 ```
