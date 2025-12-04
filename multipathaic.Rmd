@@ -877,3 +877,147 @@ The following parameters were used throughout this analysis:
 **tau = 0.6** ensures we retain only models built from variables that consistently appear across the majority of resamples, providing confidence that the selected variables are robust to sampling variation rather than artifacts of a particular dataset.
 
 These choices balance model exploration (allowing multiple competitive paths) with stability (filtering for reliable predictors).
+
+
+
+# Example Usage: Install and Use the Package
+
+## Installation from GitHub
+```{r, eval=FALSE}
+# Install multipathaic package from GitHub
+remotes::install_github("R-4-Data-Science/FinalProjectmultipathaic")
+```
+
+## Load Package and Generate Example Data
+```{r}
+# Load the package
+library(multipathaic)
+
+# Generate synthetic data for demonstration
+set.seed(123)
+n <- 150; p <- 10
+X <- as.data.frame(matrix(rnorm(n*p), n, p))
+names(X) <- paste0("x", 1:p)
+beta <- c(2, -1.5, 0, 0, 1, rep(0, p-5))
+y <- as.numeric(as.matrix(X) %*% beta + rnorm(n, 1))
+```
+
+## Step-by-Step: Using Individual Functions
+
+### Step 1: Build Multiple Paths
+```{r}
+# Run multi-path forward selection
+forest <- build_paths(
+  X = X, 
+  y = y, 
+  family = "gaussian", 
+  K = min(ncol(X), 10), 
+  eps = 1e-6, 
+  delta = 2, 
+  L = 50,
+  verbose = FALSE
+)
+
+# View final step results
+tail_step <- length(forest$path_forest$frontiers)
+cat("Models at final step:\n")
+print(forest$path_forest$frontiers[[tail_step]])
+```
+
+### Step 2: Compute Stability
+```{r}
+# Estimate variable stability across resamples
+stab <- stability(
+  X = X, 
+  y = y, 
+  family = "gaussian",
+  K = 10, 
+  eps = 1e-6, 
+  delta = 2, 
+  L = 50,
+  B = 50,
+  resample_fraction = 0.8,
+  verbose = FALSE
+)
+
+# Display stability scores
+cat("\nStability scores:\n")
+print(round(stab$pi, 3))
+```
+
+### Step 3: Select Plausible Models
+```{r}
+# Filter for plausible and stable models
+plaus <- plausible_models(
+  forest = forest, 
+  pi = stab$pi, 
+  Delta = 2, 
+  tau = 0.6,
+  verbose = TRUE
+)
+
+# Summary of selected models
+cat("\nPlausible models summary:\n")
+print(plaus$summary)
+```
+
+## Complete Pipeline: All-in-One Function
+
+```{r}
+# Run complete multi-path AIC procedure
+result <- multipath_aic(
+  X = X,
+  y = y,
+  family = "gaussian",
+  K = min(ncol(X), 10),
+  eps = 1e-6,
+  delta = 2,
+  L = 50,
+  B = 50,
+  resample_fraction = 0.8,
+  Delta = 2,
+  tau = 0.6,
+  verbose = FALSE
+)
+
+print(result)
+
+# Access results
+cat("\nFinal plausible models:\n")
+print(result$plaus$summary)
+
+cat("\nTop 5 stable variables:\n")
+print(head(result$stab$pi, 5))
+```
+
+## Logistic Regression Example
+```{r}
+# Generate binary outcome data
+set.seed(42)
+n <- 200; p <- 8
+X_logit <- as.data.frame(matrix(rnorm(n*p), n, p))
+names(X_logit) <- paste0("x", 1:p)
+eta <- 1.5*X_logit$x1 - 2*X_logit$x2 + 1*X_logit$x5
+prob <- 1 / (1 + exp(-eta))
+y_logit <- rbinom(n, 1, prob)
+
+# Run logistic version
+result_logit <- multipath_aic(
+  X = X_logit,
+  y = y_logit,
+  family = "binomial",
+  K = 8,
+  B = 50,
+  Delta = 2,
+  tau = 0.6,
+  verbose = FALSE
+)
+
+
+print(result_logit)
+
+# Evaluate with confusion metrics
+if (nrow(result_logit$plaus$plausible_models) > 0) {
+  confusion_metrics(result_logit, model_index = 1, cutoff = 0.5)
+}
+```
