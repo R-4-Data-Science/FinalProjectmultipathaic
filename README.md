@@ -27,8 +27,11 @@ Multi-Path Stepwise Selection with AIC for Linear and Logistic Regression
 
 Install the package directly from GitHub:
 ```r
+ Install remotes if not already installed
+install.packages("remotes")
+
 # Install multipathaic
-devtools::install_github("R-4-Data-Science/FinalProjectmultipathaic")
+remotes::install_github("R-4-Data-Science/FinalProjectmultipathaic")
 ```
 
 ## Interactive Shiny App 

@@ -12,65 +12,65 @@ library(DT)
 # UI Definition
 ui <- fluidPage(
   theme = bslib::bs_theme(bootswatch = "flatly"),
-  
+
   titlePanel("Multi-Path AIC Selection Explorer"),
-  
+
   sidebarLayout(
     sidebarPanel(
       width = 3,
-      
+
       h4("Data Setup"),
-      
+
       selectInput("family", "Model Family:",
                   choices = c("Gaussian (Linear)" = "gaussian",
                               "Binomial (Logistic)" = "binomial"),
                   selected = "gaussian"),
-      
-      numericInput("n_obs", "Number of Observations:", 
+
+      numericInput("n_obs", "Number of Observations:",
                    value = 150, min = 50, max = 500, step = 10),
-      
-      numericInput("n_pred", "Number of Predictors:", 
+
+      numericInput("n_pred", "Number of Predictors:",
                    value = 8, min = 4, max = 20, step = 1),
-      
+
       hr(),
-      
+
       h4("Algorithm Parameters"),
-      
-      numericInput("K", "Max Steps (K):", 
+
+      numericInput("K", "Max Steps (K):",
                    value = 8, min = 3, max = 15, step = 1),
-      
-      numericInput("delta", "AIC Tolerance (δ):", 
+
+      numericInput("delta", "AIC Tolerance (δ):",
                    value = 2, min = 0, max = 5, step = 0.5),
-      
-      numericInput("L", "Max Models per Step (L):", 
+
+      numericInput("L", "Max Models per Step (L):",
                    value = 50, min = 10, max = 100, step = 10),
-      
-      numericInput("B", "Stability Resamples (B):", 
+
+      numericInput("B", "Stability Resamples (B):",
                    value = 30, min = 10, max = 100, step = 10),
-      
-      numericInput("Delta", "Plausibility Tolerance (Δ):", 
+
+      numericInput("Delta", "Plausibility Tolerance (Δ):",
                    value = 2, min = 0, max = 5, step = 0.5),
-      
-      numericInput("tau", "Stability Threshold (τ):", 
+
+      numericInput("tau", "Stability Threshold (τ):",
                    value = 0.6, min = 0, max = 1, step = 0.1),
-      
+
       hr(),
-      
-      actionButton("run", "Run Analysis", 
+
+      actionButton("run", "Run Analysis",
                    class = "btn-primary btn-lg btn-block"),
-      
+
       br(), br(),
-      
-      downloadButton("download_report", "Download Report", 
+
+      downloadButton("download_report", "Download Report",
                      class = "btn-success btn-block")
     ),
-    
+
     mainPanel(
       width = 9,
-      
+
       tabsetPanel(
         id = "tabs",
-        
+
         # Tab 1: Overview
         tabPanel("Overview",
                  br(),
@@ -82,7 +82,7 @@ ui <- fluidPage(
                  h4("Models by Step"),
                  plotOutput("models_by_step", height = "300px")
         ),
-        
+
         # Tab 2: Plausible Models
         tabPanel("Plausible Models",
                  br(),
@@ -95,7 +95,7 @@ ui <- fluidPage(
                  h4("Variable Inclusion Probabilities"),
                  plotlyOutput("inclusion_plot", height = "400px")
         ),
-        
+
         # Tab 3: Branching Tree
         tabPanel("Branching Visualization",
                  br(),
@@ -104,7 +104,7 @@ ui <- fluidPage(
                  br(),
                  uiOutput("branching_info")
         ),
-        
+
         # Tab 4: Diagnostics
         tabPanel("Diagnostics",
                  br(),
@@ -119,14 +119,14 @@ ui <- fluidPage(
                    verbatimTextOutput("confusion_metrics")
                  )
         ),
-        
+
         # Tab 5: About
         tabPanel("About",
                  br(),
                  h3("Multi-Path AIC Selection"),
-                 p("This Shiny app demonstrates the", code("multipathaic"), 
+                 p("This Shiny app demonstrates the", code("multipathaic"),
                    "R package for multi-path forward selection using AIC."),
-                 
+
                  h4("Key Features"),
                  tags$ul(
                    tags$li("Explores multiple competitive model paths simultaneously"),
@@ -134,7 +134,7 @@ ui <- fluidPage(
                    tags$li("Identifies plausible models balancing fit and stability"),
                    tags$li("Supports both Gaussian and binomial regression")
                  ),
-                 
+
                  h4("Algorithms"),
                  tags$ol(
                    tags$li(strong("build_paths()"), " - Multi-path forward selection with branching"),
@@ -142,17 +142,17 @@ ui <- fluidPage(
                    tags$li(strong("plausible_models()"), " - AIC + stability filtering"),
                    tags$li(strong("multipath_aic()"), " - Complete pipeline")
                  ),
-                 
+
                  h4("Installation"),
                  pre('remotes::install_github("R-4-Data-Science/FinalProjectmultipathaic")'),
-                 
+
                  h4("Authors"),
                  p("Michael Obuobi, Jinchen Jiang, Far Rahmati"),
                  p("Auburn University, 2025"),
-                 
+
                  hr(),
-                 p("Repository:", 
-                   a("GitHub", 
+                 p("Repository:",
+                   a("GitHub",
                      href = "https://github.com/R-4-Data-Science/FinalProjectmultipathaic",
                      target = "_blank"))
         )
@@ -163,20 +163,20 @@ ui <- fluidPage(
 
 # Server Logic
 server <- function(input, output, session) {
-  
+
   # Reactive values to store results
   results <- reactiveValues(
     data = NULL,
     result = NULL,
     run_time = NULL
   )
-  
+
   # Generate data and run analysis
   observeEvent(input$run, {
-    
+
     # Show progress
     withProgress(message = 'Running Multi-Path AIC...', value = 0, {
-      
+
       # Generate synthetic data
       incProgress(0.1, detail = "Generating data...")
       set.seed(123)
@@ -184,7 +184,7 @@ server <- function(input, output, session) {
       p <- input$n_pred
       X <- as.data.frame(matrix(rnorm(n*p), n, p))
       names(X) <- paste0("x", 1:p)
-      
+
       # Generate response
       if (input$family == "gaussian") {
         # Linear: make first 3 variables important
@@ -199,13 +199,13 @@ server <- function(input, output, session) {
         prob <- 1 / (1 + exp(-eta))
         y <- rbinom(n, 1, prob)
       }
-      
+
       results$data <- list(X = X, y = y)
-      
+
       # Run multi-path AIC
       incProgress(0.2, detail = "Building paths...")
       start_time <- Sys.time()
-      
+
       result <- multipath_aic(
         X = X,
         y = y,
@@ -220,31 +220,31 @@ server <- function(input, output, session) {
         tau = input$tau,
         verbose = FALSE
       )
-      
+
       end_time <- Sys.time()
       results$run_time <- as.numeric(difftime(end_time, start_time, units = "secs"))
-      
+
       incProgress(0.7, detail = "Finalizing results...")
       results$result <- result
-      
+
       incProgress(1, detail = "Complete!")
     })
-    
+
     showNotification("Analysis complete!", type = "message", duration = 3)
   })
-  
+
   # Overview UI
   output$overview_ui <- renderUI({
     req(results$result)
-    
+
     result <- results$result
     n_models <- nrow(result$plaus$plausible_models)
     n_steps <- length(result$forest$path_forest$frontiers)
     best_aic <- round(result$plaus$best_aic, 2)
-    
+
     tagList(
       fluidRow(
-        column(3, 
+        column(3,
                div(class = "card bg-primary text-white",
                    div(class = "card-body",
                        h3(n_steps),
@@ -279,11 +279,11 @@ server <- function(input, output, session) {
       )
     )
   })
-  
+
   # Stability plot
   output$stability_plot <- renderPlotly({
     req(results$result)
-    
+
     pi <- results$result$stab$pi
     df <- data.frame(
       Variable = names(pi),
@@ -291,7 +291,7 @@ server <- function(input, output, session) {
     )
     df <- df[order(df$Stability, decreasing = TRUE), ]
     df$Variable <- factor(df$Variable, levels = df$Variable)
-    
+
     p <- ggplot(df, aes(x = Variable, y = Stability)) +
       geom_col(aes(fill = Stability)) +
       geom_hline(yintercept = input$tau, linetype = "dashed", color = "red") +
@@ -301,22 +301,22 @@ server <- function(input, output, session) {
            caption = paste("Red line = τ threshold (", input$tau, ")")) +
       theme_minimal() +
       theme(axis.text.x = element_text(angle = 45, hjust = 1))
-    
+
     ggplotly(p)
   })
-  
+
   # Models by step
   output$models_by_step <- renderPlot({
     req(results$result)
-    
+
     frontiers <- results$result$forest$path_forest$frontiers
     n_models <- sapply(frontiers, nrow)
-    
+
     df <- data.frame(
       Step = 1:length(n_models),
       Models = n_models
     )
-    
+
     ggplot(df, aes(x = Step, y = Models)) +
       geom_line(color = "steelblue", size = 1) +
       geom_point(color = "steelblue", size = 3) +
@@ -325,13 +325,13 @@ server <- function(input, output, session) {
       theme_minimal() +
       theme(text = element_text(size = 12))
   })
-  
+
   # Plausible models table
   output$plausible_table <- renderDT({
     req(results$result)
-    
+
     plaus <- results$result$plaus$plausible_models
-    
+
     display_df <- data.frame(
       Model_ID = seq_len(nrow(plaus)),
       AIC = round(plaus$AIC, 2),
@@ -339,46 +339,46 @@ server <- function(input, output, session) {
       Avg_Stability = round(plaus$avg_stability, 3),
       N_Vars = sapply(plaus$model, length)
     )
-    
-    datatable(display_df, 
+
+    datatable(display_df,
               options = list(pageLength = 10, scrollX = TRUE),
               rownames = FALSE)
   })
-  
+
   # Overlap heatmap
   output$overlap_heatmap <- renderPlotly({
     req(results$result)
-    
+
     plaus <- results$result$plaus$plausible_models
-    
+
     if (nrow(plaus) < 2) {
-      return(plotly_empty() %>% 
+      return(plotly_empty() %>%
                layout(title = "Need at least 2 plausible models for overlap heatmap"))
     }
-    
+
     # Create overlap matrix
     n_models <- min(nrow(plaus), 15)  # Limit to 15 for visibility
     plaus_subset <- plaus[1:n_models, ]
-    
+
     overlap_matrix <- matrix(0, n_models, n_models)
-    
+
     for (i in 1:n_models) {
       for (j in 1:n_models) {
         vars_i <- plaus_subset$model[[i]]
         vars_j <- plaus_subset$model[[j]]
-        
+
         if (length(vars_i) == 0 || length(vars_j) == 0) {
           overlap_matrix[i, j] <- 0
         } else {
-          overlap <- length(intersect(vars_i, vars_j)) / 
+          overlap <- length(intersect(vars_i, vars_j)) /
             length(union(vars_i, vars_j))
           overlap_matrix[i, j] <- overlap
         }
       }
     }
-    
+
     model_labels <- paste("Model", 1:n_models)
-    
+
     plot_ly(
       x = model_labels,
       y = model_labels,
@@ -393,11 +393,11 @@ server <- function(input, output, session) {
         yaxis = list(title = "")
       )
   })
-  
+
   # Inclusion probability plot
   output$inclusion_plot <- renderPlotly({
     req(results$result)
-    
+
     inclusion <- results$result$plaus$inclusion
     df <- data.frame(
       Variable = names(inclusion),
@@ -405,7 +405,7 @@ server <- function(input, output, session) {
     )
     df <- df[order(df$Inclusion, decreasing = TRUE), ]
     df$Variable <- factor(df$Variable, levels = df$Variable)
-    
+
     p <- ggplot(df, aes(x = Variable, y = Inclusion)) +
       geom_col(aes(fill = Inclusion)) +
       geom_hline(yintercept = 1, linetype = "dashed", color = "darkgreen") +
@@ -414,35 +414,35 @@ server <- function(input, output, session) {
            x = "Variable", y = "Inclusion Probability") +
       theme_minimal() +
       theme(axis.text.x = element_text(angle = 45, hjust = 1))
-    
+
     ggplotly(p)
   })
-  
+
   # Branching tree visualization
   output$branching_tree <- renderPlotly({
     req(results$result)
-    
+
     frontiers <- results$result$forest$path_forest$frontiers
-    
+
     # Build tree data
     nodes <- list()
     edges <- list()
     node_id <- 0
-    
+
     # Root node
-    nodes[[1]] <- list(id = node_id, step = 0, aic = results$result$forest$all_models$AIC[1], 
+    nodes[[1]] <- list(id = node_id, step = 0, aic = results$result$forest$all_models$AIC[1],
                        vars = "", parent = -1)
     parent_map <- list()
     parent_map[[""]] <- 0
-    
+
     for (step in seq_along(frontiers)) {
       frontier <- frontiers[[step]]
-      
+
       for (i in 1:min(nrow(frontier), 20)) {  # Limit for visualization
         node_id <- node_id + 1
         vars <- frontier$model[[i]]
         key <- frontier$key[i]
-        
+
         # Find parent (model with one less variable)
         parent_vars <- if (length(vars) > 1) {
           sapply(vars, function(v) {
@@ -452,7 +452,7 @@ server <- function(input, output, session) {
         } else {
           ""
         }
-        
+
         parent_id <- parent_map[[""]]  # Default to root
         for (pv in parent_vars) {
           if (!is.null(parent_map[[pv]])) {
@@ -460,7 +460,7 @@ server <- function(input, output, session) {
             break
           }
         }
-        
+
         nodes[[node_id + 1]] <- list(
           id = node_id,
           step = step,
@@ -468,19 +468,19 @@ server <- function(input, output, session) {
           vars = paste(vars, collapse = ", "),
           parent = parent_id
         )
-        
+
         parent_map[[key]] <- node_id
-        
+
         edges[[length(edges) + 1]] <- list(from = parent_id, to = node_id)
       }
     }
-    
+
     # Convert to data frames
     nodes_df <- do.call(rbind, lapply(nodes, function(n) {
-      data.frame(id = n$id, step = n$step, aic = n$aic, 
+      data.frame(id = n$id, step = n$step, aic = n$aic,
                  vars = n$vars, stringsAsFactors = FALSE)
     }))
-    
+
     # Create sunburst-style plot
     plot_ly() %>%
       add_trace(
@@ -505,35 +505,35 @@ server <- function(input, output, session) {
         yaxis = list(title = "AIC")
       )
   })
-  
+
   # Branching info
   output$branching_info <- renderUI({
     req(results$result)
-    
+
     frontiers <- results$result$forest$path_forest$frontiers
     total_models <- sum(sapply(frontiers, nrow))
-    
+
     tagList(
       p(strong("Total unique models explored:"), total_models),
       p(strong("Final step:"), length(frontiers)),
       p("Each point represents a model. Color indicates the step at which it was generated.")
     )
   })
-  
+
   # Performance UI
   output$performance_ui <- renderUI({
     req(results$result)
-    
+
     plaus <- results$result$plaus$plausible_models
-    
+
     if (nrow(plaus) == 0) {
       return(p("No plausible models found."))
     }
-    
+
     best_vars <- plaus$model[[1]]
     best_aic <- plaus$AIC[1]
     best_stability <- plaus$avg_stability[1]
-    
+
     tagList(
       h5("Best Model (Lowest AIC):"),
       p(strong("Variables:"), paste(best_vars, collapse = ", ")),
@@ -542,42 +542,42 @@ server <- function(input, output, session) {
       p(strong("Number of Variables:"), length(best_vars))
     )
   })
-  
+
   # Confusion plot (for binomial)
   output$confusion_plot <- renderPlot({
     req(results$result)
     req(input$family == "binomial")
-    
+
     plaus_set <- results$result$plaus$plausible_models
-    
+
     if (nrow(plaus_set) == 0) return(NULL)
-    
+
     # Get confusion matrix data
     selected_vars <- plaus_set$model[[1]]
     X <- results$result$forest$model_data$X
     y <- results$result$forest$model_data$y
-    
+
     df <- data.frame(y = y, X)
     form <- as.formula(paste("y ~", paste(selected_vars, collapse = " + ")))
     model <- glm(form, data = df, family = binomial())
-    
+
     p_hat <- predict(model, type = "response")
     y_pred <- ifelse(p_hat >= 0.5, 1, 0)
-    
+
     TP <- sum(y_pred == 1 & y == 1)
     TN <- sum(y_pred == 0 & y == 0)
     FP <- sum(y_pred == 1 & y == 0)
     FN <- sum(y_pred == 0 & y == 1)
-    
+
     conf_matrix <- matrix(c(TP, FP, FN, TN), nrow = 2, byrow = TRUE)
-    
+
     # Plot confusion matrix
     conf_df <- data.frame(
       Predicted = rep(c("1", "0"), each = 2),
       Actual = rep(c("1", "0"), 2),
       Count = c(TP, FP, FN, TN)
     )
-    
+
     ggplot(conf_df, aes(x = Actual, y = Predicted, fill = Count)) +
       geom_tile(color = "white", size = 2) +
       geom_text(aes(label = Count), size = 20, color = "white") +
@@ -587,17 +587,17 @@ server <- function(input, output, session) {
       theme_minimal() +
       theme(text = element_text(size = 14))
   })
-  
+
   # Confusion metrics
   output$confusion_metrics <- renderPrint({
     req(results$result)
     req(input$family == "binomial")
-    
+
     if (nrow(results$result$plaus$plausible_models) > 0) {
       confusion_metrics(results$result, model_index = 1, cutoff = 0.5, verbose = TRUE)
     }
   })
-  
+
   # Download report
   output$download_report <- downloadHandler(
     filename = function() {
@@ -606,7 +606,7 @@ server <- function(input, output, session) {
     content = function(file) {
       # Create a simple HTML report
       req(results$result)
-      
+
       html_content <- paste0(
         "<html><head><title>Multi-Path AIC Report</title></head><body>",
         "<h1>Multi-Path AIC Selection Report</h1>",
@@ -624,7 +624,7 @@ server <- function(input, output, session) {
         "<p>Best AIC: ", round(results$result$plaus$best_aic, 2), "</p>",
         "</body></html>"
       )
-      
+
       writeLines(html_content, file)
     }
   )
