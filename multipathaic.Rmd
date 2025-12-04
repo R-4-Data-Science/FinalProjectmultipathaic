@@ -12,21 +12,19 @@ output:
     highlight: tango     
     df_print: paged      
 ---
-
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
 
 # Algorithm 1: Multi-Path Forward Selection with AIC 
 ## Building Multiple Model Paths
-
 ```{r}
-multipath_forward_selection <- function(
+build_paths <- function(
     X, y,
     family = c("gaussian", "binomial"),
     K = min(ncol(X), 10),
-    epsilon = 1e-6,
+    eps = 1e-6,
     delta = 2,
     L = 100,
     weights = NULL,
@@ -63,9 +61,9 @@ multipath_forward_selection <- function(
   
   if (verbose) cat(sprintf("Step 0: Intercept-only AIC = %.4f\n", base_aic))
   
-  steps <- list()
+  frontiers <- list()
   all_models <- current_parents
-  audit_log <- list()
+  aic_by_model <- list()
   
   for (k in seq_len(K)) {
     if (verbose) {
@@ -105,7 +103,7 @@ multipath_forward_selection <- function(
       best_idx <- which.min(cand$AIC)
       best_aic <- cand$AIC[best_idx]
       cand$delta_from_best <- cand$AIC - best_aic
-      parent_improved <- (parent_aic - best_aic) >= epsilon
+      parent_improved <- (parent_aic - best_aic) >= eps
       cand$kept <- parent_improved & (cand$AIC <= (best_aic + delta))
       
       # print per-parent summary
@@ -116,7 +114,7 @@ multipath_forward_selection <- function(
         to_show <- cand[order(cand$AIC), c("added_var", "AIC", "delta_from_best", "kept")]
         rownames(to_show) <- NULL
         print(to_show, row.names = FALSE)
-        if (!parent_improved) cat("   No child improves AIC by ≥ epsilon; parent does not expand.\n")
+        if (!parent_improved) cat("   No child improves AIC by ≥ eps; parent does not expand.\n")
       }
       
       # keep near-ties for next step
@@ -134,15 +132,10 @@ multipath_forward_selection <- function(
             )
         }
       }
-      
-      # store audit info
-      cand$step <- k
-      cand$parent_vars <- I(list(parent_vars))
-      audit_log[[length(audit_log) + 1]] <- cand
     }
     
     if (!any_parent_improved) {
-      if (verbose) cat("\nNo parent improved by ≥ epsilon; stopping early.\n")
+      if (verbose) cat("\nNo parent improved by ≥ eps; stopping early.\n")
       break
     }
     
@@ -172,7 +165,7 @@ multipath_forward_selection <- function(
                   min(children$AIC), max(children$AIC)))
     }
     
-    steps[[k]] <- children
+    frontiers[[k]] <- children
     all_models <- rbind(all_models, children)
     current_parents <- children
   }
@@ -180,18 +173,22 @@ multipath_forward_selection <- function(
   # Final clean up
   all_models <- all_models[order(all_models$size, all_models$AIC), ]
   rownames(all_models) <- NULL
-  audit_df <- if (length(audit_log)) do.call(rbind, audit_log) else NULL
+  
+  # Create aic_by_model list
+  for (i in seq_len(nrow(all_models))) {
+    aic_by_model[[all_models$key[i]]] <- all_models$AIC[i]
+  }
   
   list(
-    steps = steps,
+    path_forest = list(frontiers = frontiers),
+    aic_by_model = aic_by_model,
     all_models = all_models,
-    audit_log = audit_df,
-    params = list(K=K, epsilon=epsilon, delta=delta, L=L, family=family)
+    meta = list(K=K, eps=eps, delta=delta, L=L, family=family)
   )
 }
 
 
-# Example Usage for Multipath Algorithm
+# Example Usage for build_paths
 # Linear
 set.seed(1)
 n <- 150; p <- 8
@@ -200,19 +197,18 @@ names(X) <- paste0("x", 1:p)
 beta <- c(2, -1.5, 0, 0, 1, rep(0, p-5))
 y <- as.numeric(as.matrix(X) %*% beta + rnorm(n, 1))
 
-res <- multipath_forward_selection(
+forest <- build_paths(
   X, y,
   family="gaussian",
   K=min(ncol(X), 10),
-  epsilon=1e-6,
+  eps=1e-6,
   delta=2,
   L=100,
   verbose=TRUE
 )
 
-
-tail_step <- length(res$steps)
-res$steps[[tail_step]]
+tail_step <- length(forest$path_forest$frontiers)
+forest$path_forest$frontiers[[tail_step]]
 
 
 
@@ -227,19 +223,19 @@ eta <- 1.5*X$x1 - 2*X$x2 + 1*X$x5
 prob <- 1 / (1 + exp(-eta))
 y <- rbinom(n, 1, prob)
 
-# Run stability estimation for logistic regression
-res <- multipath_forward_selection(
+# Run multi-path forward selection for logistic regression
+forest <- build_paths(
   X, y,
   family="binomial",
   K=min(ncol(X), 10),
-  epsilon=1e-6,
+  eps=1e-6,
   delta=2,
   L=100,
   verbose=TRUE
 )
 
-tail_step <- length(res$steps)
-res$steps[[tail_step]]
+tail_step <- length(forest$path_forest$frontiers)
+forest$path_forest$frontiers[[tail_step]]
 ```
 
 
@@ -248,25 +244,26 @@ res$steps[[tail_step]]
 
 # Algorithm 2: Stability Estimation with Resampling
 ## Evaluates how stable variable selection is across multiple resamples
-
 ```{r}
-stability_estimation <- function(X, y,
-                                 family = c("gaussian", "binomial"),
-                                 K = min(ncol(X), 10),
-                                 epsilon = 1e-6,
-                                 delta = 2,
-                                 L = 100,
-                                 B = 100,                    # number of resamples
-                                 resample_fraction = 0.8,    # fraction of rows per resample
-                                 verbose = TRUE) {
+stability <- function(X, y,
+                      family = c("gaussian", "binomial"),
+                      K = min(ncol(X), 10),
+                      eps = 1e-6,
+                      delta = 2,
+                      L = 100,
+                      B = 100,                    # number of resamples
+                      resample_fraction = 0.8,    # fraction of rows per resample
+                      verbose = TRUE) {
   
   # Match family argument
   family <- match.arg(family)
   
   # --- Initialize ---
   p <- ncol(X)
-  freq <- numeric(p)
-  names(freq) <- colnames(X)
+  pnames <- colnames(X)
+  if (is.null(pnames)) pnames <- paste0("V", seq_len(p))
+  
+  pi_sum <- setNames(numeric(p), pnames)  # running sum for pi_j
   
   if (verbose) {
     cat("Running stability estimation with", B, "resamples...\n\n")
@@ -274,7 +271,7 @@ stability_estimation <- function(X, y,
   
   # --- Main loop ---
   for (b in seq_len(B)) {
-    if (verbose) cat("Resample", b, "of", B, "...\n")
+    if (verbose && b %% 10 == 0) cat("Resample", b, "of", B, "...\n")
     
     # Step 1: Resample the data (bootstrap or subsample)
     idx <- sample(1:nrow(X),
@@ -283,13 +280,13 @@ stability_estimation <- function(X, y,
     Xb <- X[idx, , drop = FALSE]
     yb <- y[idx]
     
-    # Step 2: Run Multiple-Path Forward Selection on resample
-    res_b <- tryCatch({
-      multipath_forward_selection(
+    # Step 2: Run Multi-Path Forward Selection on resample
+    forest_b <- tryCatch({
+      build_paths(
         Xb, yb,
         family = family,
         K = K,
-        epsilon = epsilon,
+        eps = eps,
         delta = delta,
         L = L,
         verbose = FALSE
@@ -299,34 +296,47 @@ stability_estimation <- function(X, y,
       return(NULL)
     })
     
-    # Step 3: If run successful, extract selected variables
-    if (!is.null(res_b) && length(res_b$steps) > 0) {
-      last_step <- res_b$steps[[length(res_b$steps)]]
-      selected_vars <- unique(unlist(strsplit(last_step$key, "\\|")))
-      freq[selected_vars] <- freq[selected_vars] + 1
+    # Step 3: Compute z_j^(b) = proportion of models containing variable j
+    if (!is.null(forest_b) && length(forest_b$path_forest$frontiers) > 0) {
+      last_frontier <- forest_b$path_forest$frontiers[[length(forest_b$path_forest$frontiers)]]
+      
+      if (nrow(last_frontier) > 0) {
+        # Extract all variables from all models at final step
+        all_vars <- unlist(strsplit(last_frontier$key, "\\|"))
+        n_models <- nrow(last_frontier)
+        
+        # Count occurrences of each variable across models
+        var_counts <- table(all_vars)
+        
+        # Compute z_j^(b) = proportion of models containing j
+        z_b <- var_counts / n_models
+        
+        # Add to running sum
+        pi_sum[names(z_b)] <- pi_sum[names(z_b)] + z_b
+      }
     }
   }
   
-  # --- Compute stability scores ---
-  stability <- freq / B
-  stability <- sort(stability, decreasing = TRUE)
+  # --- Compute stability scores: pi_j = (1/B) * sum(z_j^(b)) ---
+  pi <- pi_sum / B
+  pi <- sort(pi, decreasing = TRUE)
   
   # --- Output ---
   if (verbose) {
     cat("\nCompleted", B, "resamples.\n")
     cat("Top stable variables:\n")
-    print(round(stability, 3))
+    print(round(pi, 3))
   }
   
   return(list(
-    stability = stability,
-    freq = freq,
+    pi = pi,
+    pi_sum = pi_sum,
     B = B,
     call = match.call()
   ))
 }
 
-# Example Usage for Stability Algorithm
+# Example Usage for stability
 # Linear 
 set.seed(123)
 n <- 150; p <- 10
@@ -337,14 +347,14 @@ y <- as.numeric(as.matrix(X) %*% beta + rnorm(n, 1))
 
 
 # Run stability estimation for linear regression
-stab_res <- stability_estimation(
+stab <- stability(
   X, y,
   family = "gaussian",
   K = min(ncol(X), 10),
-  epsilon = 1e-6,
+  eps = 1e-6,
   delta = 2,
   L = 100,
-  B = 100,              # can increase to 100 for final run
+  B = 50,              
   resample_fraction = 0.8,
   verbose = TRUE
 )
@@ -362,14 +372,14 @@ prob <- 1 / (1 + exp(-eta))
 y <- rbinom(n, 1, prob)
 
 # Run stability estimation for logistic regression
-stab_logit <- stability_estimation(
+stab <- stability(
   X, y,
   family = "binomial",
   K = 8,
-  epsilon = 1e-6,
+  eps = 1e-6,
   delta = 2,
   L = 100,
-  B = 100,
+  B = 50,
   resample_fraction = 0.8,
   verbose = TRUE
 )
@@ -383,44 +393,46 @@ stab_logit <- stability_estimation(
 
 # Algorithm 3: Selecting Plausible Models
 ## The final set of plausible, stable models
-
 ```{r}
-select_plausible_models <- function(all_models,
-                                    stability_scores = NULL,
-                                    delta_plausible = 2,
-                                    tau_stability = 0.6,   # tau threshold for average stability
-                                    verbose = TRUE) {
+plausible_models <- function(forest,
+                              pi = NULL,
+                              Delta = 2,
+                              tau = 0.6,
+                              verbose = TRUE) {
   # --- Sanity check ---
-  if (is.null(all_models) || !"AIC" %in% colnames(all_models)) {
-    stop("all_models must be a data frame from multipath_forward_selection()")
+  if (is.null(forest$all_models) || !"AIC" %in% colnames(forest$all_models)) {
+    stop("forest must be a result object from build_paths()")
   }
+  
+  all_models <- forest$all_models
   
   # --- Step 1–3: AIC-based plausibility ---
   best_aic <- min(all_models$AIC, na.rm = TRUE)
-  cutoff <- best_aic + delta_plausible
+  cutoff <- best_aic + Delta
   
   plausible <- subset(all_models, AIC <= cutoff)
   plausible <- plausible[order(plausible$AIC), ]
   
   if (verbose) {
     cat("Best AIC =", round(best_aic, 3), "\n")
-    cat("Cutoff (change in AIC <=", delta_plausible, ") =", round(cutoff, 3), "\n")
+    cat("Cutoff (Delta =", Delta, ") =", round(cutoff, 3), "\n")
     cat("Number of plausible models before stability filter:", nrow(plausible), "\n\n")
   }
   
   # --- Step 4: Compute model-level average stability (if available) ---
-  if (!is.null(stability_scores)) {
+  if (!is.null(pi)) {
     plausible$avg_stability <- sapply(plausible$model, function(m) {
-      mean(stability_scores[m], na.rm = TRUE)
+      if (length(m) == 0) return(0)
+      mean(pi[m], na.rm = TRUE)
     })
     
     # --- Step 5: Filter models by tau stability threshold ---
     before_filter <- nrow(plausible)
-    plausible <- subset(plausible, avg_stability >= tau_stability)
+    plausible <- subset(plausible, avg_stability >= tau)
     after_filter <- nrow(plausible)
     
     if (verbose) {
-      cat(sprintf("Applied stability threshold tau = %.2f\n", tau_stability))
+      cat(sprintf("Applied stability threshold tau = %.2f\n", tau))
       cat(sprintf("Models kept after stability filter: %d (removed %d)\n\n",
                   after_filter, before_filter - after_filter))
     }
@@ -447,8 +459,8 @@ select_plausible_models <- function(all_models,
   summary_table <- data.frame(
     Variable = marked_vars,
     InclusionProb = round(inclusion, 3),
-    Stability = if (!is.null(stability_scores[names(inclusion)]))
-      round(stability_scores[names(inclusion)], 3)
+    Stability = if (!is.null(pi[names(inclusion)]))
+      round(pi[names(inclusion)], 3)
     else NA,
     stringsAsFactors = FALSE
   )
@@ -463,43 +475,48 @@ select_plausible_models <- function(all_models,
     cat("\nVariable inclusion probabilities (final plausible set):\n")
     print(summary_table)
     
-    # --- NEW SECTION TO SHOW ALL MODELS (with real row IDs) ---
+    # Show all models
     if (nrow(plausible) > 0) {
-      cat("\nAll plausible models (change in AIC ≤", delta_plausible, "):\n")
+      cat("\nAll plausible models (Delta ≤", Delta, "):\n")
       for (i in seq_len(nrow(plausible))) {
-        model_id <- rownames(plausible)[i]  # use actual model index
+        model_id <- rownames(plausible)[i]
         cat(sprintf("Model ID %s: AIC = %.3f | Variables = %s\n",
                     model_id, plausible$AIC[i],
                     paste(plausible$model[[i]], collapse = ", ")))
       }
     }
-    
   }
-  
   
   # --- Output ---
   return(list(
     plausible_models = plausible,
     inclusion = inclusion,
     summary = summary_table,
-    delta_plausible = delta_plausible,
-    tau_stability = tau_stability,
+    Delta = Delta,
+    tau = tau,
     best_aic = best_aic
   ))
 }
 
 
-# Example Usage for Plausible
-## Assume we already ran Algorithm 1 and Algorithm 2
-res <- multipath_forward_selection(X, y, family="gaussian")
-stab <- stability_estimation(X, y, family="gaussian", B=100, verbose=FALSE)
+# Example Usage for plausible_models
+# Assume we already ran Algorithm 1 and Algorithm 2
+set.seed(123)
+n <- 150; p <- 10
+X <- as.data.frame(matrix(rnorm(n*p), n, p))
+names(X) <- paste0("x", 1:p)
+beta <- c(2, -1.5, 0, 0, 1, rep(0, p-5))
+y <- as.numeric(as.matrix(X) %*% beta + rnorm(n, 1))
+
+forest <- build_paths(X, y, family="gaussian", verbose=FALSE)
+stab <- stability(X, y, family="gaussian", B=50, verbose=FALSE)
 
 # Algorithm 3: Selecting Plausible Models
-plausible_res <- select_plausible_models(
-  all_models = res$all_models,
-  stability_scores = stab$stability,
-  delta_plausible = 2,   # AIC tolerance δ
-  tau_stability = 0.6,   # stability threshold tau
+plaus <- plausible_models(
+  forest = forest,
+  pi = stab$pi,
+  Delta = 2,   # AIC tolerance
+  tau = 0.6,   # stability threshold
   verbose = TRUE
 )
 ```
@@ -510,17 +527,17 @@ plausible_res <- select_plausible_models(
 
 # Algorithm 4: Overall Multi-Path AIC Procedure 
 ```{r}
-multi_path_AIC_procedure <- function(
+multipath_aic <- function(
     X, y,
     family = c("gaussian", "binomial"),
     K = min(ncol(X), 10),
-    epsilon = 1e-6,
+    eps = 1e-6,
     delta = 2,
     L = 100,
     B = 100,
     resample_fraction = 0.8,
-    delta_plausible = 2,
-    tau_threshold = 0.6,
+    Delta = 2,
+    tau = 0.6,
     verbose = TRUE
 ) {
   family <- match.arg(family)
@@ -528,11 +545,11 @@ multi_path_AIC_procedure <- function(
   
   # Step 1: Multi-Path Forward Selection
   if (verbose) cat("\n[Step 1] Running Multi-Path Forward Selection...\n")
-  res_full <- multipath_forward_selection(
+  forest <- build_paths(
     X, y,
     family = family,
     K = K,
-    epsilon = epsilon,
+    eps = eps,
     delta = delta,
     L = L,
     verbose = verbose
@@ -540,11 +557,11 @@ multi_path_AIC_procedure <- function(
   
   # Step 2: Stability Estimation with Resampling
   if (verbose) cat("\n[Step 2] Estimating Variable Stability with Resampling...\n")
-  stab <- stability_estimation(
+  stab <- stability(
     X, y,
     family = family,
     K = K,
-    epsilon = epsilon,
+    eps = eps,
     delta = delta,
     L = L,
     B = B,
@@ -554,11 +571,11 @@ multi_path_AIC_procedure <- function(
   
   # Step 3: Selecting Plausible Models
   if (verbose) cat("\n[Step 3] Selecting Plausible Stable Models...\n")
-  plausible <- select_plausible_models(
-    all_models = res_full$all_models,
-    stability_scores = stab$stability,
-    delta_plausible = delta_plausible,
-    tau_stability = tau_threshold,
+  plaus <- plausible_models(
+    forest = forest,
+    pi = stab$pi,
+    Delta = Delta,
+    tau = tau,
     verbose = verbose
   )
   
@@ -567,19 +584,17 @@ multi_path_AIC_procedure <- function(
   if (verbose) cat("==================================================================\n")
   
   # Attach data for downstream evaluation
-  res_full$model_data <- list(X = X, y = y)
+  forest$model_data <- list(X = X, y = y)
   
   return(list(
-    full_search = res_full,
-    stability = stab,
-    plausible_models = plausible
+    forest = forest,
+    stab = stab,
+    plaus = plaus
   ))
 }
 
 
-# Example Usage for multi path AIC procedure
-# Data
-
+# Example Usage for multipath_aic
 # Linear 
 set.seed(123)
 n <- 150; p <- 10
@@ -588,12 +603,13 @@ names(X) <- paste0("x", 1:p)
 beta <- c(2, -1.5, 0, 0, 1, rep(0, p-5))
 y <- as.numeric(as.matrix(X) %*% beta + rnorm(n, 1))
 
-final_res <- multi_path_AIC_procedure(
+result <- multipath_aic(
   X, y,
   family = "gaussian",
-  K = min(ncol(X), 10), B = 100,
-  delta_plausible = 2,
-  tau_threshold = 0.6,
+  K = min(ncol(X), 10), 
+  B = 50,
+  Delta = 2,
+  tau = 0.6,
   verbose = TRUE
 )
 
@@ -610,12 +626,13 @@ eta <- 1.5*X$x1 - 2*X$x2 + 1*X$x5
 prob <- 1 / (1 + exp(-eta))
 y <- rbinom(n, 1, prob)
 
-final_res <- multi_path_AIC_procedure(
+result <- multipath_aic(
   X, y,
   family = "binomial",
-  K = min(ncol(X), 10), B = 100,
-  delta_plausible = 2,
-  tau_threshold = 0.6,
+  K = min(ncol(X), 10), 
+  B = 50,
+  Delta = 2,
+  tau = 0.6,
   verbose = TRUE
 )
 ```
@@ -624,12 +641,10 @@ final_res <- multi_path_AIC_procedure(
 
 # Diabetes Progression Data - Linear Regression 
 ##  Efron et al. (2004) Diabetes Dataset for Multi-Path AIC Procedure
-
 ```{r}
 # --- Load required packages ---
 library(lars)
 library(caret)
-library(tidyverse)
 
 # --- Load the dataset ---
 data(diabetes)  # available in lars package
@@ -637,7 +652,6 @@ data(diabetes)  # available in lars package
 # Extract response and predictors
 y <- diabetes$y                      # continuous diabetes progression measure
 X <- as.data.frame(diabetes$x)       # 10 baseline predictors
-colnames(X)
 
 # --- (Optional) Add quadratic and interaction terms to reach ~60 predictors ---
 # Use model.matrix to automatically generate 2nd order polynomial features
@@ -648,52 +662,98 @@ formula_expanded <- as.formula(
 
 X_expanded <- as.data.frame(model.matrix(formula_expanded, data = X))
 X_expanded <- X_expanded[, -1]  # remove intercept column
+
+# --- CRITICAL: Clean column names to avoid formula issues ---
+colnames(X_expanded) <- make.names(colnames(X_expanded), unique = TRUE)
+
 cat("Expanded predictors:", ncol(X_expanded), "\n")
 
 # --- Standardize predictors (recommended for AIC comparability) ---
-X_scaled <- scale(X_expanded)
+X_scaled <- as.data.frame(scale(X_expanded))
 
-# --- Quick sanity check ---
-summary(y)
-dim(X_scaled)
+# --- Train/Test Split (70/30) ---
+set.seed(123)
+train_idx <- createDataPartition(y, p = 0.7, list = FALSE)
+X_train <- X_scaled[train_idx, , drop = FALSE]
+X_test <- X_scaled[-train_idx, , drop = FALSE]
+y_train <- y[train_idx]
+y_test <- y[-train_idx]
 
-# --- Run Multi-Path AIC Procedure (Algorithm 4) ---
-final_res <- multi_path_AIC_procedure(
-  X = as.data.frame(X_scaled),
-  y = y,
-  family = "gaussian",          # regression problem
-  K = 10,                       # number of steps (can increase)
-  B = 50,                       # stability resamples
-  delta_plausible = 2,
-  tau_threshold = 0.6,
+cat("Training set:", nrow(X_train), "samples\n")
+cat("Test set:", nrow(X_test), "samples\n\n")
+
+# --- Run Multi-Path AIC Procedure on Training Data ---
+result <- multipath_aic(
+  X = X_train,
+  y = y_train,
+  family = "gaussian",
+  K = 10,
+  B = 50,
+  Delta = 2,
+  tau = 0.6,
   verbose = TRUE
 )
 
 # --- Inspect final plausible models ---
-head(final_res$plausible_models$plausible_models)
+cat("\n=== Final Plausible Models ===\n")
+head(result$plaus$plausible_models)
 
 # --- Display variable inclusion probabilities and stability ---
-final_res$plausible_models$summary
+cat("\n=== Variable Summary ===\n")
+print(result$plaus$summary)
 
+# --- Evaluate best model on test set ---
+if (nrow(result$plaus$plausible_models) > 0) {
+  best_model_vars <- result$plaus$plausible_models$model[[1]]
+  
+  # Verify all variables exist in both train and test
+  if (!all(best_model_vars %in% colnames(X_train))) {
+    cat("Warning: Some selected variables not found in training data\n")
+  } else {
+    # Create training data frame with only selected variables
+    train_df <- data.frame(y = y_train, X_train[, best_model_vars, drop = FALSE])
+    
+    # Fit model using . notation (includes all columns except y)
+    final_fit <- lm(y ~ ., data = train_df)
+    
+    # Create test data frame with same structure
+    test_df <- data.frame(X_test[, best_model_vars, drop = FALSE])
+    
+    # Predict on test set
+    y_pred <- predict(final_fit, newdata = test_df)
+    
+    # Compute test RMSE
+    test_rmse <- sqrt(mean((y_test - y_pred)^2))
+    
+    cat("\n=== Test Set Evaluation ===\n")
+    cat("Best Model Variables:", paste(best_model_vars, collapse = ", "), "\n")
+    cat("Test RMSE:", round(test_rmse, 3), "\n")
+    
+    # Additional metrics
+    train_pred <- predict(final_fit)
+    train_rmse <- sqrt(mean((y_train - train_pred)^2))
+    cat("Train RMSE:", round(train_rmse, 3), "\n")
+    cat("R-squared (train):", round(summary(final_fit)$r.squared, 3), "\n")
+  }
+}
 ```
 
 
 
-## confusion_metrics(): Evaluate logistic models from Multi-Path AIC pipeline
-
+# Optional: confusion_metrics() for Logistic Models
 ```{r}
 confusion_metrics <- function(result_object, model_index = 1, cutoff = 0.5, verbose = TRUE) {
   # --- Input checks ---
-  if (is.null(result_object$plausible_models$plausible_models)) {
-    stop("Result object must come from multi_path_AIC_procedure().")
+  if (is.null(result_object$plaus$plausible_models)) {
+    stop("Result object must come from multipath_aic().")
   }
   
-  plausible_set <- result_object$plausible_models$plausible_models
+  plausible_set <- result_object$plaus$plausible_models
   if (nrow(plausible_set) < model_index) {
     stop("Requested model_index exceeds number of plausible models.")
   }
   
-  # --- Identify true model ID (row name in plausible table) ---
+  # --- Identify true model ID ---
   model_id <- rownames(plausible_set)[model_index]
   if (is.null(model_id) || model_id == "") model_id <- model_index
   
@@ -702,8 +762,8 @@ confusion_metrics <- function(result_object, model_index = 1, cutoff = 0.5, verb
   if (length(selected_vars) == 0) stop("Selected model has no predictors.")
   
   # --- Retrieve X and y from stored data ---
-  X <- result_object$full_search$model_data$X
-  y <- result_object$full_search$model_data$y
+  X <- result_object$forest$model_data$X
+  y <- result_object$forest$model_data$y
   
   # --- Refit logistic model ---
   df <- data.frame(y = y, X)
@@ -752,46 +812,68 @@ confusion_metrics <- function(result_object, model_index = 1, cutoff = 0.5, verb
   
   invisible(metrics)
 }
-
 ```
 
 
-### Logistic Regression 
+## Logistic Regression Example with Confusion Metrics
 ```{r}
-set.seed(1)
+# Generate synthetic binary data
+set.seed(42)
 n <- 200; p <- 10
 X <- as.data.frame(matrix(rnorm(n*p), n, p))
 names(X) <- paste0("x", 1:p)
 
-# Generate a binary outcome (logistic model)
+# True model: x1, x2, x5 are important
 eta <- 1.5*X$x1 - 2*X$x2 + 1*X$x5
 prob <- 1 / (1 + exp(-eta))
 y <- rbinom(n, 1, prob)
-```
 
-
-### Run the logistic version of the pipeline
-```{r}
-final_res <- multi_path_AIC_procedure(
+# Run the logistic version of the pipeline
+result <- multipath_aic(
   X, y,
   family = "binomial",
   K = min(ncol(X), 10),
   B = 50,
-  delta_plausible = 2,
-  tau_threshold = 0.6,
+  Delta = 2,
+  tau = 0.6,
   verbose = TRUE
 )
 
-# Evaluate first plausible model
-confusion_metrics(final_res, model_index = 1)
-
-# Evaluate another model if you have several plausible ones
-confusion_metrics(final_res, model_index = 2)
-
-# Evaluate All Models
-for (i in seq_len(nrow(final_res$plausible_models$plausible_models))) {
-  confusion_metrics(final_res, model_index = i)
+# Evaluate confusion metrics for plausible models
+if (nrow(result$plaus$plausible_models) >= 1) {
+  confusion_metrics(result, model_index = 1)
 }
 
+if (nrow(result$plaus$plausible_models) >= 2) {
+  confusion_metrics(result, model_index = 2)
+}
 
+# Evaluate all models
+cat("\n=== Evaluating All Plausible Models ===\n")
+for (i in seq_len(nrow(result$plaus$plausible_models))) {
+  confusion_metrics(result, model_index = i)
+}
 ```
+
+
+# Summary and Parameter Justification
+
+## Recommended Parameter Choices
+
+The following parameters were used throughout this analysis:
+
+- **K = min(p, 10)**: Maximum number of forward selection steps, limited to avoid overfitting
+- **eps = 1e-6**: Minimum AIC improvement threshold (very small to allow exploration)
+- **delta = 2**: AIC tolerance for keeping near-tie models (follows standard guideline that models within 2 AIC units are indistinguishable)
+- **L = 50-100**: Maximum models kept per level to control computational growth
+- **B = 50-100**: Number of bootstrap resamples for stability (balance between precision and computation)
+- **Delta = 2**: AIC tolerance for plausibility filter (same rationale as delta)
+- **tau = 0.6**: Minimum average stability threshold (keeps models with variables appearing in >60% of resamples, indicating strong stability)
+
+## Justification
+
+**Delta = 2** is justified by the widely-accepted statistical principle that models within 2 AIC units have essentially equivalent support from the data (Burnham & Anderson, 2002).
+
+**tau = 0.6** ensures we retain only models built from variables that consistently appear across the majority of resamples, providing confidence that the selected variables are robust to sampling variation rather than artifacts of a particular dataset.
+
+These choices balance model exploration (allowing multiple competitive paths) with stability (filtering for reliable predictors).
