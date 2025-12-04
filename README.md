@@ -53,8 +53,6 @@ launch_app()
 - **Performance Metrics**: Confusion matrix and diagnostics for classification models
 - **Export Results**: Download analysis reports
 
-![Shiny App Screenshot](https://via.placeholder.com/800x400?text=Multi-Path+AIC+Explorer)
-
 *The app supports both Gaussian and binomial regression with synthetic data generation for demonstrations.*
 
 ## Quick Start
