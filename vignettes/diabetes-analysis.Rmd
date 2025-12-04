@@ -152,6 +152,17 @@ cat("Best AIC:", round(plaus$best_aic, 2), "\n\n")
 # Display variable summary
 cat("Variable inclusion summary:\n")
 print(head(plaus$summary, 15))
+
+#————————Outcome
+
+library(kableExtra)
+
+best_aic_text <- paste0("Variable Inclusion and Stability Summary (Best AIC = ", 
+                        round(plaus$best_aic, 2), ")")
+
+head(plaus$summary, 15) %>%
+  kbl(caption = best_aic_text, digits = 3) %>%
+  kable_classic(full_width = FALSE, html_font = "Arial")
 ```
 
 # Model Evaluation on Test Set
@@ -184,6 +195,43 @@ if (nrow(plaus$plausible_models) > 0) {
   cat("Test Correlation:", round(test_cor, 3), "\n")
   cat("R-squared (train):", round(summary(final_fit)$r.squared, 3), "\n")
 }
+
+#————————Outcome
+
+library(knitr)
+library(kableExtra)
+
+# Create a clean summary table
+performance_table <- data.frame(
+  Metric = c(
+    "Variables selected",
+    "Variable names",
+    "Training RMSE",
+    "Test RMSE",
+    "Test Correlation",
+    "Train R-squared",
+    "AIC (train)"
+  ),
+  Value = c(
+    length(best_model_vars),
+    paste(best_model_vars, collapse = ", "),
+    round(train_rmse, 3),
+    round(test_rmse, 3),
+    round(test_cor, 3),
+    round(summary(final_fit)$r.squared, 3),
+    round(AIC(final_fit), 3)
+  )
+)
+
+# Pretty kable output
+kbl(
+  performance_table,
+  caption = "Best Model Performance Summary",
+  align = "l",
+  escape = FALSE
+) %>%
+  kable_classic(full_width = FALSE, html_font = "Arial")  
+
 ```
 
 # Summary
