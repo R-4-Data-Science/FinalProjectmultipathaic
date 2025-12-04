@@ -104,6 +104,8 @@ forest <- build_paths(
   verbose = FALSE
 )
 
+print(forest)
+
 cat("Total models explored:", nrow(forest$all_models), "\n")
 cat("Models at final step:", nrow(forest$path_forest$frontiers[[length(forest$path_forest$frontiers)]]), "\n")
 ```
@@ -125,6 +127,8 @@ stab <- stability(
   verbose = FALSE
 )
 
+print(stab)
+
 # Display top stable variables
 cat("\nTop 10 most stable variables:\n")
 print(round(head(stab$pi, 10), 3))
@@ -132,9 +136,10 @@ print(round(head(stab$pi, 10), 3))
 
 ## Algorithm 3: Plausible Model Selection
 
-We filter models using AIC tolerance (Δ = 2) and stability threshold (τ = 0.6):
+We filter models using AIC tolerance ($\Delta$ = 2) and stability threshold ($\tau$ = 0.6):
 
 **Parameter Justification:**
+
 - **Delta = 2**: Following the standard guideline (Burnham & Anderson, 2002) that models within 2 AIC units have essentially equivalent empirical support.
 - **tua = 0.6**: Ensures we retain only models built from variables appearing in >60% of resamples, providing confidence that selected variables are robust to sampling variation.
 ```{r plausible-models}
@@ -145,6 +150,8 @@ plaus <- plausible_models(
   tau = 0.6,
   verbose = FALSE
 )
+
+print(plaus)
 
 cat("Number of plausible models:", nrow(plaus$plausible_models), "\n")
 cat("Best AIC:", round(plaus$best_aic, 2), "\n\n")
@@ -186,7 +193,7 @@ if (nrow(plaus$plausible_models) > 0) {
 }
 ```
 
-# Summary
+# Summary and Parameter Justification
 
 This analysis demonstrates the multi-path AIC selection framework on a challenging regression problem with many correlated predictors. The procedure successfully:
 
@@ -196,6 +203,30 @@ This analysis demonstrates the multi-path AIC selection framework on a challengi
 4. **Achieved good predictive performance** on held-out test data
 
 The final model includes `r if(nrow(plaus$plausible_models) > 0) length(plaus$plausible_models$model[[1]]) else "NA"` predictors and demonstrates that the multi-path approach can effectively navigate high-dimensional predictor spaces while maintaining model parsimony.
+
+
+
+## Recommended Parameter Choices
+
+The following parameters were used throughout this analysis:
+
+- **K = min(p, 10)**: Maximum number of forward selection steps, limited to avoid overfitting
+- **eps = 1e-6**: Minimum AIC improvement threshold (very small to allow exploration)
+- **delta = 2**: AIC tolerance for keeping near-tie models (follows standard guideline that models within 2 AIC units are indistinguishable)
+- **L = 25-100**: Maximum models kept per level to control computational growth
+- **B = 50-100**: Number of bootstrap resamples for stability (balance between precision and computation)
+- **Delta = 2**: AIC tolerance for plausibility filter (same rationale as delta)
+- **tau = 0.6**: Minimum average stability threshold (keeps models with variables appearing in >60% of resamples, indicating strong stability)
+
+## Justification
+
+**Delta = 2** is justified by the widely-accepted statistical principle that models within 2 AIC units have essentially equivalent support from the data (Burnham & Anderson, 2002).
+
+**tau = 0.6** ensures we retain only models built from variables that consistently appear across the majority of resamples, providing confidence that the selected variables are robust to sampling variation rather than artifacts of a particular dataset.
+
+These choices balance model exploration (allowing multiple competitive paths) with stability (filtering for reliable predictors).
+
+
 
 # References
 
