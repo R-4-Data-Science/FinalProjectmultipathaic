@@ -27,7 +27,7 @@ Multi-Path Stepwise Selection with AIC for Linear and Logistic Regression
 
 Install the package directly from GitHub:
 ```r
- Install remotes if not already installed
+# Install remotes if not already installed
 install.packages("remotes")
 
 # Install multipathaic
