@@ -13,7 +13,7 @@ Multi-Path Stepwise Selection with AIC for Linear and Logistic Regression
 - **Plausible model selection**: Combines AIC-based filtering with stability thresholds
 - **Dual family support**: Works with both Gaussian (linear) and binomial (logistic) regression
 - **Diagnostic tools**: Confusion matrix and performance metrics for classification models
-- **Interactive Shiny App**: Explore the algorithm with visualizations and real-time parameter tuning
+- **Interactive Shiny App**: Professional dashboard with data upload, visualizations, and real-time analysis
 
 ### Algorithms Implemented
 
@@ -36,26 +36,110 @@ remotes::install_github("R-4-Data-Science/FinalProjectmultipathaic")
 
 ## Interactive Shiny App 
 
-Explore the multi-path AIC selection procedure interactively with our built-in Shiny application!
+Explore the multi-path AIC selection procedure with our comprehensive interactive dashboard!
 
 ### Launch the App
 ```r
-# Install required packages first
+# Install required packages first (if not already installed)
 install.packages(c("shiny", "shinydashboard", "plotly", "DT", "ggplot2", "readxl"))
+
+# Load package and launch
 library(multipathaic)
 launch_app()
 ```
 
-### App Features
+###  App Features
 
-- **Interactive Controls**: Adjust parameters (K, δ, Δ, τ, B) in real-time
-- **Variable Stability Plot**: Visualize which predictors are most stable across resamples
-- **Model Overlap Heatmap**: See Jaccard similarity between plausible models
-- **Branching Visualization**: Explore the multi-path tree structure by step
-- **Performance Metrics**: Confusion matrix and diagnostics for classification models
-- **Export Results**: Download analysis reports
+#### **Data Management**
+- **Flexible Data Input**:
+  - Upload your own data files (CSV, TXT, XLS, XLSX)
+  - Select specific sheets from Excel workbooks
+  - Configure delimiters for text files (comma, semicolon, tab, space)
+  - Generate synthetic data for testing and demonstrations
+  
+- **Data Cleaning & Preview**:
+  - Automatic handling of missing values
+  - Column name sanitization
+  - Interactive data preview with filtering
+  - Comprehensive data summary statistics
 
-*The app supports both Gaussian and binomial regression with synthetic data generation for demonstrations.*
+#### **Algorithm Controls**
+- **Real-time Parameter Tuning**:
+  - K: Maximum forward selection steps (3-20)
+  - δ: AIC branching tolerance (0-5)
+  - L: Maximum models per step (10-200)
+  - B: Bootstrap resamples (10-200)
+  - Δ: Plausibility tolerance (0-5)
+  - τ: Stability threshold (0-1)
+
+#### **Visualizations**
+
+**Results Tab:**
+- Variable stability scores with threshold line
+- Models retained by step (line plot with area fill)
+- Top 10 most stable variables with color-coded bars
+- Summary value boxes (steps, models, AIC, runtime)
+
+**Plausible Models Tab:**
+- Interactive table of selected models with AIC and stability
+- Jaccard overlap heatmap between models
+- Variable inclusion probability across plausible models
+
+**Branching Tree Tab:**
+- Interactive scatter plot of all explored models
+- Step-by-step visualization of path exploration
+- Point size indicates number of variables
+- Color-coded by selection step
+
+**Diagnostics Tab:**
+
+*For Binomial (Logistic) Models:*
+- Confusion matrix with color gradient (TP, TN, FP, FN)
+- Performance metric cards (Accuracy, Sensitivity, Specificity, Precision)
+- ROC curve with AUC calculation
+- Predicted probability distribution by class
+
+*For Gaussian (Linear) Models:*
+- Residual plot with LOESS smoothing
+- Predicted vs Actual scatter with R² and RMSE
+- Model performance summary cards
+
+#### **Export & Reporting**
+- Download comprehensive HTML reports
+- Model summaries with parameter settings
+- Top stable variables table
+- Plausible models ranking
+
+### App Screenshots
+
+The app features a modern dashboard layout with:
+-  Blue-themed professional interface
+-  Responsive design with collapsible sections
+-  Interactive plots powered by Plotly
+-  Sortable, filterable data tables
+-  Value boxes for key metrics
+-  Real-time progress indicators
+
+###  Educational Use
+
+Perfect for:
+- Teaching variable selection methods
+- Demonstrating bootstrap stability
+- Comparing model selection strategies
+- Understanding AIC-based selection
+- Exploring multi-path algorithms
+
+###  Example Workflow in App
+
+1. **Upload Data**: Navigate to Data tab, upload your CSV/Excel file
+2. **Preview**: Review data summary and select variables
+3. **Set Parameters**: Go to Parameters tab, adjust K, δ, Δ, τ, B
+4. **Run Analysis**: Click "Run Multi-Path AIC Analysis"
+5. **View Results**: Explore stability plots and value boxes
+6. **Check Models**: Review plausible models and overlap
+7. **Explore Paths**: Visualize branching in Branching Tree tab
+8. **Diagnostics**: Examine performance metrics and plots
+9. **Download**: Export HTML report of findings
 
 ## Quick Start
 
@@ -260,6 +344,23 @@ Data (X, y)
 Final Plausible Models
 ```
 
+## System Requirements
+
+### Required R Packages
+```r
+# Core dependencies (automatically installed)
+- stats
+
+# Shiny app dependencies (install manually)
+install.packages(c("shiny", "shinydashboard", "plotly", "DT", "ggplot2"))
+
+# For Excel file support (optional)
+install.packages("readxl")
+
+# For vignette datasets (optional)
+install.packages(c("lars", "caret"))
+```
+
 ## Citation
 
 If you use this package, please cite:
@@ -276,9 +377,9 @@ https://github.com/R-4-Data-Science/FinalProjectmultipathaic
 
 ## Authors
 
-- Michael Obuobi (Auburn University)
-- Jinchen Jiang (Auburn University)
-- Far Rahmati (Auburn University)
+- **Michael Obuobi** (Auburn University) - [mio0011@auburn.edu](mailto:mio0011@auburn.edu)
+- **Jinchen Jiang** (Auburn University)
+- **Far Rahmati** (Auburn University)
 
 ## License
 
@@ -288,12 +389,17 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-## Issues and Contributions
+## Issues and Support
 
-Report bugs or request features at: https://github.com/R-4-Data-Science/FinalProjectmultipathaic/issues
+- **Report bugs**: https://github.com/R-4-Data-Science/FinalProjectmultipathaic/issues
+- **Request features**: https://github.com/R-4-Data-Science/FinalProjectmultipathaic/issues
+- **View documentation**: `?multipathaic` or `help(package = "multipathaic")`
 
 ---
 
 **Package Status**: Active Development  
-**Course**: STAT 7020 - Auburn University  
-**Date**: December 2025
+
+## Acknowledgments
+
+We thank the Auburn University Department of Mathematics and Statistics for support and guidance throughout this project.
+
