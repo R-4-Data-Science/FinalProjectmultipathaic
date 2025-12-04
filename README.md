@@ -13,6 +13,7 @@ Multi-Path Stepwise Selection with AIC for Linear and Logistic Regression
 - **Plausible model selection**: Combines AIC-based filtering with stability thresholds
 - **Dual family support**: Works with both Gaussian (linear) and binomial (logistic) regression
 - **Diagnostic tools**: Confusion matrix and performance metrics for classification models
+- **Interactive Shiny App**: Explore the algorithm with visualizations and real-time parameter tuning
 
 ### Algorithms Implemented
 
@@ -32,6 +33,29 @@ install.packages("remotes")
 # Install multipathaic
 remotes::install_github("R-4-Data-Science/FinalProjectmultipathaic")
 ```
+
+## Interactive Shiny App 
+
+Explore the multi-path AIC selection procedure interactively with our built-in Shiny application!
+
+### Launch the App
+```r
+library(multipathaic)
+launch_app()
+```
+
+### App Features
+
+- **Interactive Controls**: Adjust parameters (K, δ, Δ, τ, B) in real-time
+- **Variable Stability Plot**: Visualize which predictors are most stable across resamples
+- **Model Overlap Heatmap**: See Jaccard similarity between plausible models
+- **Branching Visualization**: Explore the multi-path tree structure by step
+- **Performance Metrics**: Confusion matrix and diagnostics for classification models
+- **Export Results**: Download analysis reports
+
+![Shiny App Screenshot](https://via.placeholder.com/800x400?text=Multi-Path+AIC+Explorer)
+
+*The app supports both Gaussian and binomial regression with synthetic data generation for demonstrations.*
 
 ## Quick Start
 
@@ -206,6 +230,35 @@ vignette("diabetes-analysis", package = "multipathaic")
 | `plausible_models()` | Filter models by AIC + stability |
 | `multipath_aic()` | Complete pipeline (Algorithms 1-3) |
 | `confusion_metrics()` | Classification performance metrics |
+| `launch_app()` | Launch interactive Shiny application |
+
+## Workflow Diagram
+```
+Data (X, y)
+    ↓
+┌─────────────────────────────────────┐
+│  Algorithm 1: build_paths()         │
+│  Multi-path forward selection       │
+│  - Explores multiple branches       │
+│  - Keeps near-optimal models        │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│  Algorithm 2: stability()           │
+│  Bootstrap resampling               │
+│  - Computes variable stability      │
+│  - Identifies reliable predictors   │
+└─────────────────────────────────────┘
+    ↓
+┌─────────────────────────────────────┐
+│  Algorithm 3: plausible_models()    │
+│  AIC + stability filtering          │
+│  - Combines fit & stability         │
+│  - Returns final model set          │
+└─────────────────────────────────────┘
+    ↓
+Final Plausible Models
+```
 
 ## Citation
 
@@ -231,6 +284,16 @@ https://github.com/R-4-Data-Science/FinalProjectmultipathaic
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
 ## Issues and Contributions
 
 Report bugs or request features at: https://github.com/R-4-Data-Science/FinalProjectmultipathaic/issues
+
+---
+
+**Package Status**: Active Development  
+**Course**: STAT 7020 - Auburn University  
+**Date**: December 2025
