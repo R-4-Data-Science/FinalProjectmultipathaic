@@ -506,6 +506,48 @@ ui <- dashboardPage(
 # ==================== Server Logic ====================
 server <- function(input, output, session) {
 
+  convert_to_numeric <- function(X, y) {
+    tryCatch({
+      # Convert response to numeric if it's categorical
+      if (is.character(y) || is.factor(y)) {
+        y <- as.numeric(as.factor(y)) - 1  # Convert to 0/1 for binary
+      }
+
+      # Process each predictor column
+      X_numeric <- as.data.frame(lapply(X, function(col) {
+        if (is.numeric(col)) {
+          return(col)
+        } else if (is.character(col) || is.factor(col)) {
+          # Check if binary (Yes/No, Male/Female, etc.)
+          unique_vals <- unique(na.omit(col))
+          if (length(unique_vals) == 2) {
+            # Binary variable: convert to 0/1
+            return(as.numeric(as.factor(col)) - 1)
+          } else if (length(unique_vals) <= 5) {
+            # Few categories: convert to numeric
+            return(as.numeric(as.factor(col)) - 1)
+          } else {
+            # Many categories: skip this variable
+            return(NULL)
+          }
+        } else {
+          return(as.numeric(col))
+        }
+      }))
+
+      # Remove NULL columns
+      X_numeric <- X_numeric[, !sapply(X_numeric, is.null), drop = FALSE]
+
+      # Ensure all columns are numeric
+      X_numeric <- as.data.frame(lapply(X_numeric, as.numeric))
+
+      return(list(X = X_numeric, y = as.numeric(y)))
+
+    }, error = function(e) {
+      stop(paste("Error converting data to numeric:", e$message))
+    })
+  }
+
   # Reactive values
   rv <- reactiveValues(
     data = NULL,
@@ -584,13 +626,15 @@ server <- function(input, output, session) {
       y <- rbinom(n, 1, prob)
     }
 
-    rv$data <- data.frame(y = y, X)
+    # Make sure everything is numeric
+    rv$data <- data.frame(y = as.numeric(y), X)
     rv$X <- X
-    rv$y <- y
+    rv$y <- as.numeric(y)
     rv$family <- input$family
 
     showNotification("Synthetic data generated!", type = "message", duration = 3)
   })
+
 
   # ==================== File Info Display ====================
   output$file_info <- renderUI({
@@ -759,7 +803,7 @@ server <- function(input, output, session) {
     vars <- names(rv$data)
 
     tagList(
-      h4("📋 Select Variables"),
+      h4("Select Variables"),
       selectInput("response_var", "Response Variable (y):",
                   choices = vars, selected = vars[1]),
       selectInput("predictor_vars", "Predictor Variables (X):",
@@ -773,11 +817,37 @@ server <- function(input, output, session) {
   observeEvent(input$confirm_vars, {
     req(rv$data, input$response_var, input$predictor_vars)
 
-    rv$y <- rv$data[[input$response_var]]
-    rv$X <- rv$data[, input$predictor_vars, drop = FALSE]
-    rv$family <- input$upload_family
+    tryCatch({
+      y_raw <- rv$data[[input$response_var]]
+      X_raw <- rv$data[, input$predictor_vars, drop = FALSE]
 
-    showNotification("Variables selected!", type = "message", duration = 3)
+      # Convert to numeric
+      converted <- convert_to_numeric(X_raw, y_raw)
+
+      rv$X <- converted$X
+      rv$y <- converted$y
+      rv$family <- input$upload_family
+
+      # Notify user about conversions
+      n_converted <- sum(sapply(X_raw, function(col) !is.numeric(col)))
+
+      if (n_converted > 0) {
+        showNotification(
+          paste("Converted", n_converted, "categorical variable(s) to numeric (0/1 coding)"),
+          type = "message",
+          duration = 5
+        )
+      } else {
+        showNotification("Variables selected!", type = "message", duration = 3)
+      }
+
+    }, error = function(e) {
+      showNotification(
+        paste("Error processing variables:", e$message),
+        type = "error",
+        duration = 10
+      )
+    })
   })
 
   # ==================== Data Summary ====================
@@ -788,16 +858,21 @@ server <- function(input, output, session) {
     cat("================\n\n")
     cat("Observations:", nrow(rv$X), "\n")
     cat("Predictors:", ncol(rv$X), "\n")
+    cat("Response type:", class(rv$y), "\n")
     cat("Response range:", paste(round(range(rv$y, na.rm = TRUE), 2), collapse = " to "), "\n")
 
     if (rv$family == "binomial") {
-      cat("Response distribution:\n")
+      cat("\nResponse distribution:\n")
       print(table(rv$y))
+      cat("(Note: Categorical variables converted to 0/1)\n")
     }
 
     cat("\nPredictor summary:\n")
     print(summary(rv$X))
+
+    cat("\n All variables are now numeric and ready for analysis\n")
   })
+
 
   # ==================== Data Preview ====================
   output$data_preview <- renderDT({
