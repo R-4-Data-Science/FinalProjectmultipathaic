@@ -201,7 +201,7 @@ ui <- dashboardPage(
         tabName = "parameters",
         fluidRow(
           box(
-            title = "⚙️ Algorithm Parameters",
+            title = "Algorithm Parameters",
             status = "primary",
             solidHeader = TRUE,
             width = 6,
