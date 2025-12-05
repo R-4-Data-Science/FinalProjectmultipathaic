@@ -104,8 +104,6 @@ forest <- build_paths(
   verbose = FALSE
 )
 
-print(forest)
-
 cat("Total models explored:", nrow(forest$all_models), "\n")
 cat("Models at final step:", nrow(forest$path_forest$frontiers[[length(forest$path_forest$frontiers)]]), "\n")
 ```
@@ -126,8 +124,6 @@ stab <- stability(
   resample_fraction = 0.8,
   verbose = FALSE
 )
-
-print(stab)
 
 # Display top stable variables
 cat("\nTop 10 most stable variables:\n")
@@ -151,8 +147,6 @@ plaus <- plausible_models(
   verbose = FALSE
 )
 
-print(plaus)
-
 cat("Number of plausible models:", nrow(plaus$plausible_models), "\n")
 cat("Best AIC:", round(plaus$best_aic, 2), "\n\n")
 
@@ -160,7 +154,7 @@ cat("Best AIC:", round(plaus$best_aic, 2), "\n\n")
 cat("Variable inclusion summary:\n")
 print(head(plaus$summary, 15))
 
-#————————Outcome
+# Outcome
 
 library(kableExtra)
 
@@ -203,7 +197,7 @@ if (nrow(plaus$plausible_models) > 0) {
   cat("R-squared (train):", round(summary(final_fit)$r.squared, 3), "\n")
 }
 
-#————————Outcome
+# Outcome
 
 library(knitr)
 library(kableExtra)
