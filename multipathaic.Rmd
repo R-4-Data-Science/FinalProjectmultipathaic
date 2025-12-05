@@ -1,6 +1,6 @@
 ---
 title: "multipathaic"
-author: "Michael Obuobi, Jinchen Jiang, Far Rahmati"
+author: "Michael Obuobi, Jinchen Jiang, Farkhonda Rahmati"
 date: "`r format(Sys.Date(), '%B %d, %Y')`"
 output:
   html_document:
