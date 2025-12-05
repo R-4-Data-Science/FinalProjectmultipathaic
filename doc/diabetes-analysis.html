@@ -10,9 +10,9 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-<meta name="author" content="Michael Obuobi, Jinchen Jiang, Far Rahmati" />
+<meta name="author" content="Michael Obuobi, Jinchen Jiang, Farkhonda Rahmati" />
 
-<meta name="date" content="2025-12-03" />
+<meta name="date" content="2025-12-04" />
 
 <title>Multi-Path AIC Selection: Diabetes Progression Analysis</title>
 
@@ -340,13 +340,13 @@ code > span.er { color: #a61717; background-color: #e3d2d2; }
 
 <h1 class="title toc-ignore">Multi-Path AIC Selection: Diabetes
 Progression Analysis</h1>
-<h4 class="author">Michael Obuobi, Jinchen Jiang, Far Rahmati</h4>
-<h4 class="date">2025-12-03</h4>
+<h4 class="author">Michael Obuobi, Jinchen Jiang, Farkhonda Rahmati</h4>
+<h4 class="date">2025-12-04</h4>
 
 
 
 <div id="introduction" class="section level1">
-<h1>Introduction</h1>
+<h1>1. Introduction</h1>
 <p>This vignette demonstrates the multi-path AIC selection procedure on
 the diabetes progression dataset from Efron et al. (2004). The dataset
 contains 442 patients with 10 baseline predictors measuring various
@@ -358,7 +358,7 @@ a challenging variable selection problem ideal for demonstrating the
 multi-path approach.</p>
 </div>
 <div id="load-the-package-and-data" class="section level1">
-<h1>Load the Package and Data</h1>
+<h1>1.2 Load the Package and Data</h1>
 <div class="sourceCode" id="cb1"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" tabindex="-1"></a><span class="fu">library</span>(multipathaic)</span>
 <span id="cb1-2"><a href="#cb1-2" tabindex="-1"></a><span class="fu">library</span>(lars)</span>
 <span id="cb1-3"><a href="#cb1-3" tabindex="-1"></a><span class="fu">library</span>(caret)</span></code></pre></div>
@@ -481,7 +481,7 @@ multi-path approach.</p>
 <span id="cb2-117"><a href="#cb2-117" tabindex="-1"></a><span class="co">#&gt; Original dimensions: 442 observations, 1 predictors</span></span></code></pre></div>
 </div>
 <div id="feature-engineering" class="section level1">
-<h1>Feature Engineering</h1>
+<h1>1.3 Feature Engineering</h1>
 <p>We create second-order polynomial features (interactions and
 quadratics) to increase the predictor space:</p>
 <div class="sourceCode" id="cb3"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" tabindex="-1"></a><span class="co"># Create formula for second-order terms</span></span>
@@ -504,7 +504,7 @@ quadratics) to increase the predictor space:</p>
 <span id="cb3-18"><a href="#cb3-18" tabindex="-1"></a>X_scaled <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(<span class="fu">scale</span>(X_expanded))</span></code></pre></div>
 </div>
 <div id="traintest-split" class="section level1">
-<h1>Train/Test Split</h1>
+<h1>1.4 Train/Test Split</h1>
 <p>We use a 70/30 train/test split to evaluate model performance:</p>
 <div class="sourceCode" id="cb4"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" tabindex="-1"></a><span class="fu">set.seed</span>(<span class="dv">123</span>)</span>
 <span id="cb4-2"><a href="#cb4-2" tabindex="-1"></a>train_idx <span class="ot">&lt;-</span> <span class="fu">createDataPartition</span>(y, <span class="at">p =</span> <span class="fl">0.7</span>, <span class="at">list =</span> <span class="cn">FALSE</span>)</span>
@@ -520,10 +520,10 @@ quadratics) to increase the predictor space:</p>
 <span id="cb4-12"><a href="#cb4-12" tabindex="-1"></a><span class="co">#&gt; Test set: 131 samples</span></span></code></pre></div>
 </div>
 <div id="multi-path-aic-procedure" class="section level1">
-<h1>Multi-Path AIC Procedure</h1>
+<h1>2. Multi-Path AIC Procedure</h1>
 <p>We now apply the complete multi-path AIC selection pipeline:</p>
 <div id="algorithm-1-multi-path-forward-selection" class="section level2">
-<h2>Algorithm 1: Multi-Path Forward Selection</h2>
+<h2>2.1 Algorithm 1: Multi-Path Forward Selection</h2>
 <p>We explore multiple competitive model paths using AIC-based
 branching:</p>
 <div class="sourceCode" id="cb5"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" tabindex="-1"></a>forest <span class="ot">&lt;-</span> <span class="fu">build_paths</span>(</span>
@@ -543,7 +543,7 @@ branching:</p>
 <span id="cb5-15"><a href="#cb5-15" tabindex="-1"></a><span class="co">#&gt; Models at final step: 6</span></span></code></pre></div>
 </div>
 <div id="algorithm-2-stability-estimation" class="section level2">
-<h2>Algorithm 2: Stability Estimation</h2>
+<h2>2.2 Algorithm 2: Stability Estimation</h2>
 <p>We assess variable stability across 50 bootstrap resamples:</p>
 <div class="sourceCode" id="cb6"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" tabindex="-1"></a>stab <span class="ot">&lt;-</span> <span class="fu">stability</span>(</span>
 <span id="cb6-2"><a href="#cb6-2" tabindex="-1"></a>  <span class="at">X =</span> X_train,</span>
@@ -569,7 +569,7 @@ branching:</p>
 <span id="cb6-22"><a href="#cb6-22" tabindex="-1"></a><span class="co">#&gt;     0.497     0.407</span></span></code></pre></div>
 </div>
 <div id="algorithm-3-plausible-model-selection" class="section level2">
-<h2>Algorithm 3: Plausible Model Selection</h2>
+<h2>2.3 Algorithm 3: Plausible Model Selection</h2>
 <p>We filter models using AIC tolerance (Δ = 2) and stability threshold
 (τ = 0.6):</p>
 <p><strong>Parameter Justification:</strong> - <strong>Delta =
@@ -611,7 +611,7 @@ confidence that selected variables are robust to sampling variation.</p>
 </div>
 </div>
 <div id="model-evaluation-on-test-set" class="section level1">
-<h1>Model Evaluation on Test Set</h1>
+<h1>3. Model Evaluation on Test Set</h1>
 <p>We evaluate the best plausible model on the held-out test set:</p>
 <div class="sourceCode" id="cb8"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" tabindex="-1"></a><span class="cf">if</span> (<span class="fu">nrow</span>(plaus<span class="sc">$</span>plausible_models) <span class="sc">&gt;</span> <span class="dv">0</span>) {</span>
 <span id="cb8-2"><a href="#cb8-2" tabindex="-1"></a>  <span class="co"># Extract variables from best model</span></span>
@@ -650,7 +650,7 @@ confidence that selected variables are robust to sampling variation.</p>
 <span id="cb8-35"><a href="#cb8-35" tabindex="-1"></a><span class="co">#&gt; R-squared (train): 0.519</span></span></code></pre></div>
 </div>
 <div id="summary" class="section level1">
-<h1>Summary</h1>
+<h1>4. Summary</h1>
 <p>This analysis demonstrates the multi-path AIC selection framework on
 a challenging regression problem with many correlated predictors. The
 procedure successfully:</p>
