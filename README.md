@@ -378,8 +378,8 @@ https://github.com/R-4-Data-Science/FinalProjectmultipathaic
 ## Authors
 
 - **Michael Obuobi** (Auburn University) - [mio0011@auburn.edu](mailto:mio0011@auburn.edu)
-- **Jinchen Jiang** (Auburn University)
-- **Farkhonda  Rahmati** (Auburn University)
+- **Jinchen Jiang** (Auburn University)  - [jij0009@auburn.edu](mailto:jij0009@auburn.edu)
+- **Farkhonda  Rahmati** (Auburn University) - [far0012@auburn.edu](mailto:far0012@auburn.edu)
 
 ## License
 
