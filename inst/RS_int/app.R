@@ -193,6 +193,39 @@ ui <- dashboardPage(
             hr(),
             DTOutput("data_preview")
           )
+        ),
+
+        # ========== NEW: FEATURE ENGINEERING & TRAIN/TEST SPLIT ==========
+        fluidRow(
+          box(
+            title = "Feature Engineering & Train/Test Split",
+            status = "warning",
+            solidHeader = TRUE,
+            width = 12,
+            collapsible = TRUE,
+            collapsed = TRUE,
+
+            fluidRow(
+              column(6,
+                     h4("Feature Engineering"),
+                     checkboxInput("add_interactions",
+                                   "Add Interaction Terms",
+                                   value = FALSE),
+                     helpText("Creates pairwise interaction terms between predictors")
+              ),
+              column(6,
+                     h4("Train/Test Split"),
+                     sliderInput("train_pct",
+                                 "Training Set Percentage:",
+                                 min = 50, max = 90, value = 70, step = 5),
+                     helpText("Percentage of data to use for training")
+              )
+            ),
+
+            actionButton("apply_features", "Apply Settings",
+                         class = "btn-primary btn-lg",
+                         icon = icon("cogs"))
+          )
         )
       ),
 
@@ -347,9 +380,34 @@ ui <- dashboardPage(
         )
       ),
 
+
       # ==================== Enhanced Diagnostics Tab ====================
       tabItem(
         tabName = "diagnostics",
+
+        # ========== NEW: TEST SET EVALUATION BOX ==========
+        fluidRow(
+          box(
+            title = "Test Set Evaluation",
+            status = "primary",
+            solidHeader = TRUE,
+            width = 12,
+
+            conditionalPanel(
+              condition = "output.has_test_data",
+              uiOutput("test_eval_content")
+            ),
+
+            conditionalPanel(
+              condition = "!output.has_test_data",
+              tags$div(
+                class = "alert alert-info",
+                icon("info-circle"),
+                " No test set available. Apply train/test split in the Data tab to enable test evaluation."
+              )
+            )
+          )
+        ),
 
         fluidRow(
           box(
@@ -553,6 +611,10 @@ server <- function(input, output, session) {
     data = NULL,
     X = NULL,
     y = NULL,
+    X_train = NULL,   # NEW
+    X_test = NULL,    # NEW
+    y_train = NULL,   # NEW
+    y_test = NULL,    # NEW
     result = NULL,
     run_time = NULL,
     family = "gaussian"
@@ -850,6 +912,67 @@ server <- function(input, output, session) {
     })
   })
 
+
+  # ==================== Apply Feature Engineering & Split ====================
+  observeEvent(input$apply_features, {
+    req(rv$X, rv$y)
+
+    tryCatch({
+      X_processed <- rv$X
+
+      # Add interactions if requested
+      if (input$add_interactions) {
+        showNotification("Creating interaction terms...",
+                         type = "message", duration = 3)
+
+        # Create all pairwise interactions
+        n_orig <- ncol(X_processed)
+        interaction_data <- list()
+
+        for (i in 1:(n_orig-1)) {
+          for (j in (i+1):n_orig) {
+            var_name <- paste0(colnames(X_processed)[i], ".",
+                               colnames(X_processed)[j])
+            interaction_data[[var_name]] <- X_processed[[i]] * X_processed[[j]]
+          }
+        }
+
+        # Combine original and interactions
+        X_processed <- cbind(X_processed, as.data.frame(interaction_data))
+
+        showNotification(
+          paste("Added", length(interaction_data), "interaction terms"),
+          type = "message", duration = 5
+        )
+      }
+
+      # Perform train/test split
+      set.seed(123)
+      n <- nrow(X_processed)
+      train_size <- floor(n * input$train_pct / 100)
+      train_idx <- sample(1:n, train_size)
+
+      rv$X_train <- X_processed[train_idx, , drop = FALSE]
+      rv$X_test <- X_processed[-train_idx, , drop = FALSE]
+      rv$y_train <- rv$y[train_idx]
+      rv$y_test <- rv$y[-train_idx]
+
+      showNotification(
+        paste0("Split complete: ", nrow(rv$X_train), " training, ",
+               nrow(rv$X_test), " test samples"),
+        type = "message", duration = 5
+      )
+
+    }, error = function(e) {
+      showNotification(
+        paste("Error:", e$message),
+        type = "error", duration = 10
+      )
+    })
+  })
+
+
+
   # ==================== Data Summary ====================
   output$data_summary <- renderPrint({
     req(rv$X, rv$y)
@@ -886,7 +1009,11 @@ server <- function(input, output, session) {
 
   # ==================== Run Analysis ====================
   observeEvent(input$run, {
-    req(rv$X, rv$y)
+    # Use split data if available, otherwise use all data
+    X_to_use <- if (!is.null(rv$X_train)) rv$X_train else rv$X
+    y_to_use <- if (!is.null(rv$y_train)) rv$y_train else rv$y
+
+    req(X_to_use, y_to_use)
 
     withProgress(message = 'Running Multi-Path AIC...', value = 0, {
 
@@ -894,8 +1021,8 @@ server <- function(input, output, session) {
       start_time <- Sys.time()
 
       result <- multipath_aic(
-        X = rv$X,
-        y = rv$y,
+        X = X_to_use,
+        y = y_to_use,
         family = rv$family,
         K = input$K,
         eps = 1e-6,
@@ -917,6 +1044,7 @@ server <- function(input, output, session) {
 
     showNotification("Analysis complete!", type = "message", duration = 5)
   })
+
 
   # ==================== Run Status ====================
   output$run_status <- renderUI({
@@ -1725,6 +1853,98 @@ server <- function(input, output, session) {
       writeLines(html_content, file)
     }
   )
+
+
+
+  # ==================== Check if Test Data Exists ====================
+  output$has_test_data <- reactive({
+    !is.null(rv$X_test) && !is.null(rv$y_test) && !is.null(rv$result)
+  })
+  outputOptions(output, "has_test_data", suspendWhenHidden = FALSE)
+
+  # ==================== Test Set Evaluation Content ====================
+  output$test_eval_content <- renderUI({
+    req(rv$result, rv$X_test, rv$y_test)
+
+    plaus <- rv$result$plaus$plausible_models
+    if (nrow(plaus) == 0) {
+      return(tags$div(class = "alert alert-warning",
+                      "No plausible models to evaluate."))
+    }
+
+    # Get best model
+    best_vars <- plaus$model[[1]]
+
+    # Use the training data we already have stored!
+    X_train <- if (!is.null(rv$X_train)) rv$X_train else rv$X
+    y_train <- if (!is.null(rv$y_train)) rv$y_train else rv$y
+
+    train_df <- data.frame(y = y_train, X_train[, best_vars, drop = FALSE])
+
+    if (rv$family == "gaussian") {
+      model <- lm(y ~ ., data = train_df)
+
+      # Predict on test
+      test_df <- rv$X_test[, best_vars, drop = FALSE]
+      y_pred <- predict(model, newdata = test_df)
+
+      # Metrics
+      test_rmse <- sqrt(mean((rv$y_test - y_pred)^2))
+      train_pred <- predict(model)
+      train_rmse <- sqrt(mean((y_train - train_pred)^2))
+      test_cor <- cor(rv$y_test, y_pred)
+
+      # Create table
+      metrics_df <- data.frame(
+        Metric = c("Variables Selected", "Training RMSE", "Test RMSE",
+                   "Test Correlation", "Train R²", "Test R²"),
+        Value = c(length(best_vars),
+                  round(train_rmse, 3),
+                  round(test_rmse, 3),
+                  round(test_cor, 3),
+                  round(summary(model)$r.squared, 3),
+                  round(test_cor^2, 3))
+      )
+
+    } else {  # binomial
+      model <- glm(y ~ ., data = train_df, family = binomial())
+
+      # Predict on test
+      test_df <- rv$X_test[, best_vars, drop = FALSE]
+      y_pred_prob <- predict(model, newdata = test_df, type = "response")
+      y_pred <- ifelse(y_pred_prob >= 0.5, 1, 0)
+
+      # Metrics
+      TP <- sum(y_pred == 1 & rv$y_test == 1)
+      TN <- sum(y_pred == 0 & rv$y_test == 0)
+      FP <- sum(y_pred == 1 & rv$y_test == 0)
+      FN <- sum(y_pred == 0 & rv$y_test == 1)
+
+      accuracy <- (TP + TN) / (TP + TN + FP + FN)
+      sensitivity <- TP / (TP + FN + 1e-8)
+      specificity <- TN / (TN + FP + 1e-8)
+
+      metrics_df <- data.frame(
+        Metric = c("Variables Selected", "Test Accuracy", "Test Sensitivity",
+                   "Test Specificity", "TP", "TN", "FP", "FN"),
+        Value = c(length(best_vars),
+                  paste0(round(accuracy * 100, 1), "%"),
+                  paste0(round(sensitivity * 100, 1), "%"),
+                  paste0(round(specificity * 100, 1), "%"),
+                  TP, TN, FP, FN)
+      )
+    }
+
+    # Render table
+    tagList(
+      h4("Best Model Performance on Test Set"),
+      tags$p(strong("Selected Variables: "),
+             paste(best_vars, collapse = ", ")),
+      hr(),
+      renderTable(metrics_df, striped = TRUE, hover = TRUE, bordered = TRUE)
+    )
+  })
+
 }
 
 # Run the application
