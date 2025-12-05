@@ -25,7 +25,7 @@ This vignette demonstrates the multi-path AIC selection procedure on the diabete
 
 We extend the predictor set by including second-order interaction and quadratic terms, resulting in approximately 60 predictors. This creates a challenging variable selection problem ideal for demonstrating the multi-path approach.
 
-# 1.1 Load the Package and Data
+## 1.1 Load the Package and Data
 ```{r load-packages, message=FALSE}
 library(multipathaic)
 library(lars)
@@ -46,7 +46,7 @@ X <- as.data.frame(diabetes$x)
 cat("Original dimensions:", nrow(X), "observations,", ncol(X), "predictors\n")
 ```
 
-# 1.2 Feature Engineering
+## 1.2 Feature Engineering
 
 We create second-order polynomial features (interactions and quadratics) to increase the predictor space:
 ```{r feature-engineering}
@@ -69,7 +69,7 @@ cat("Expanded dimensions:", ncol(X_expanded), "predictors\n")
 X_scaled <- as.data.frame(scale(X_expanded))
 ```
 
-# 1.3 Train/Test Split
+## 1.3 Train/Test Split
 
 We use a 70/30 train/test split to evaluate model performance:
 ```{r train-test-split}
@@ -248,7 +248,7 @@ The final model includes `r if(nrow(plaus$plausible_models) > 0) length(plaus$pl
 
 
 
-## 5. Recommended Parameter Choices
+# 5. Recommended Parameter Choices
 
 The following parameters were used throughout this analysis:
 
@@ -260,7 +260,7 @@ The following parameters were used throughout this analysis:
 - **Delta = 2**: AIC tolerance for plausibility filter (same rationale as delta)
 - **tau = 0.6**: Minimum average stability threshold (keeps models with variables appearing in >60% of resamples, indicating strong stability)
 
-## 6. Justification
+# 6. Justification
 
 **Delta = 2** is justified by the widely-accepted statistical principle that models within 2 AIC units have essentially equivalent support from the data (Burnham & Anderson, 2002).
 
