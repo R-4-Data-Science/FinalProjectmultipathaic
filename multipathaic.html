@@ -6829,6 +6829,9 @@ Plausible Models</h3>
 <div id="complete-pipeline-all-in-one-function" class="section level2" number="8.4">
 <h2><span class="header-section-number">8.4</span> Complete Pipeline:
 All-in-One Function</h2>
+<div id="linear-regression" class="section level3" number="8.4.1">
+<h3><span class="header-section-number">8.4.1</span> Linear
+Regression</h3>
 <div class="sourceCode" id="cb59"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb59-1"><a href="#cb59-1" tabindex="-1"></a><span class="co"># Run complete multi-path AIC procedure</span></span>
 <span id="cb59-2"><a href="#cb59-2" tabindex="-1"></a>result <span class="ot">&lt;-</span> <span class="fu">multipath_aic</span>(</span>
 <span id="cb59-3"><a href="#cb59-3" tabindex="-1"></a>  <span class="at">X =</span> X,</span>
@@ -7430,6 +7433,7 @@ All-in-One Function</h2>
 <div class="sourceCode" id="cb67"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb67-1"><a href="#cb67-1" tabindex="-1"></a><span class="fu">print</span>(<span class="fu">head</span>(result<span class="sc">$</span>stab<span class="sc">$</span>pi, <span class="dv">5</span>))</span></code></pre></div>
 <pre><code>##        x1        x2        x5        x7        x8 
 ## 1.0000000 1.0000000 1.0000000 0.8180000 0.7066667</code></pre>
+</div>
 </div>
 <div id="logistic-regression-example" class="section level2" number="8.5">
 <h2><span class="header-section-number">8.5</span> Logistic Regression

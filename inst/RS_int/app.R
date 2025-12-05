@@ -183,7 +183,7 @@ ui <- dashboardPage(
         # Data Preview
         fluidRow(
           box(
-            title = "👀 Data Preview",
+            title = "Data Preview",
             status = "info",
             solidHeader = TRUE,
             width = 12,
