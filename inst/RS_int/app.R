@@ -488,7 +488,7 @@ ui <- dashboardPage(
             pre('install.packages(c("shiny", "shinydashboard", "plotly", "DT", "ggplot2", "readxl"))'),
 
             h4("Authors"),
-            p("Michael Obuobi, Jinchen Jiang, Far Rahmati"),
+            p("Michael Obuobi, Jinchen Jiang, Farkhonda Rahmati"),
             p("Auburn University, 2025"),
 
             hr(),
