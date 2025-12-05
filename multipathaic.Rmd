@@ -964,6 +964,8 @@ print(plaus$summary)
 
 ## Complete Pipeline: All-in-One Function
 
+### Linear Regression
+
 ```{r}
 # Run complete multi-path AIC procedure
 result <- multipath_aic(
